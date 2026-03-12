@@ -1,16 +1,33 @@
-# React + Vite
+# GasUndo Kochi
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Next.js App Router migration of the GasUndo Kochi map. The UI stays client-heavy for Leaflet, clustering, sheets, and geolocation, while Overpass and Supabase access now run on the server.
 
-Currently, two official plugins are available:
+## Environment
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Create a local `.env.local` or set deployment env vars with:
 
-## React Compiler
+```bash
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The committed `.env.example` lists the same keys without secrets.
 
-## Expanding the ESLint configuration
+## Scripts
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run dev
+npm run lint
+npm run build
+npm run start
+```
+
+## Architecture
+
+- `src/app/page.jsx` renders the home page through the App Router.
+- `src/app/home-client.jsx` owns the interactive map/filter/sheet state.
+- `src/lib/restaurants.js` fetches and caches Overpass data on the server.
+- `src/lib/statuses.js` handles Supabase reads and writes on the server.
+- `src/app/api/statuses/*` exposes same-origin mutation routes with Upstash-backed rate limiting.

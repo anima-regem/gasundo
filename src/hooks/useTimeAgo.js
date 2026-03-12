@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+'use client'
 
-function formatTimeAgo(dateString) {
-  const now = new Date()
+import { useEffect, useMemo, useState } from 'react'
+
+function formatTimeAgo(dateString, nowTimestamp = Date.now()) {
+  const now = new Date(nowTimestamp)
   const date = new Date(dateString)
   const seconds = Math.floor((now - date) / 1000)
 
@@ -15,23 +17,28 @@ function formatTimeAgo(dateString) {
 }
 
 export default function useTimeAgo(dateString) {
-  const [text, setText] = useState(() => dateString ? formatTimeAgo(dateString) : '')
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
-    if (!dateString) return
+    if (!dateString) {
+      return undefined
+    }
 
-    setText(formatTimeAgo(dateString))
-
-    const interval = setInterval(() => {
-      setText(formatTimeAgo(dateString))
+    const interval = window.setInterval(() => {
+      setNow(Date.now())
     }, 30000)
 
-    return () => clearInterval(interval)
+    return () => window.clearInterval(interval)
   }, [dateString])
 
-  const now = new Date()
+  const text = useMemo(
+    () => (dateString ? formatTimeAgo(dateString, now) : ''),
+    [dateString, now]
+  )
+
+  const currentDate = new Date(now)
   const date = dateString ? new Date(dateString) : null
-  const isStale = date ? (now - date) > 24 * 60 * 60 * 1000 : false
+  const isStale = date ? (currentDate - date) > 24 * 60 * 60 * 1000 : false
 
   return { text, isStale }
 }
