@@ -6,16 +6,21 @@ import { useEffect } from 'react'
 import L from 'leaflet'
 
 import { DEFAULT_MAP_ZOOM, KOCHI_CENTER } from '@/lib/constants'
-import { buildStatusKey } from '@/lib/status-key'
 
 import LocateButton from './LocateButton'
 import RestaurantMarker from './RestaurantMarker'
 
 const createClusterCustomIcon = function (cluster) {
+  const count = cluster.getChildCount()
+
   return L.divIcon({
-    html: `<span>${cluster.getChildCount()}</span>`,
+    html: `
+      <div class="custom-cluster-core" aria-label="${count} restaurants in this cluster">
+        <span>${count}</span>
+      </div>
+    `,
     className: 'custom-cluster-icon',
-    iconSize: L.point(40, 40, true),
+    iconSize: L.point(54, 54, true),
   })
 }
 
@@ -35,7 +40,15 @@ function MapController({ selectedRestaurant }) {
   return null
 }
 
-export default function MapView({ restaurants, statusMap, onSelectRestaurant, selectedRestaurant }) {
+export default function MapView({
+  restaurantIds,
+  restaurantsById,
+  statusMap,
+  onSelectRestaurant,
+  selectedRestaurant,
+  selectedRestaurantId,
+  onLocateError,
+}) {
   return (
     <MapContainer
       center={KOCHI_CENTER}
@@ -47,23 +60,33 @@ export default function MapView({ restaurants, statusMap, onSelectRestaurant, se
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <MarkerClusterGroup chunkedLoading iconCreateFunction={createClusterCustomIcon}>
-        {restaurants.map((r) => {
-          const key = buildStatusKey(r.lat, r.lng)
-          const statusData = statusMap[key]
+      <MarkerClusterGroup
+        chunkedLoading
+        showCoverageOnHover={false}
+        iconCreateFunction={createClusterCustomIcon}
+      >
+        {restaurantIds.map((restaurantId) => {
+          const restaurant = restaurantsById[restaurantId]
+
+          if (!restaurant) {
+            return null
+          }
+
+          const statusData = statusMap[restaurant.restaurant_key]
           const status = statusData?.status || 'unknown'
 
           return (
             <RestaurantMarker
-              key={`${r.id}_${key}`}
-              restaurant={r}
+              key={restaurant.restaurant_key}
+              restaurant={restaurant}
               status={status}
+              isSelected={selectedRestaurantId === restaurant.restaurant_key}
               onClick={onSelectRestaurant}
             />
           )
         })}
       </MarkerClusterGroup>
-      <LocateButton />
+      <LocateButton onError={onLocateError} />
       <MapController selectedRestaurant={selectedRestaurant} />
     </MapContainer>
   )
