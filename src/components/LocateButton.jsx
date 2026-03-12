@@ -1,8 +1,11 @@
+'use client'
+
 import { useMap } from 'react-leaflet'
 import { useState } from 'react'
 import L from 'leaflet'
 
 let userMarker = null
+let userAccuracyCircle = null
 
 export default function LocateButton() {
   const map = useMap()
@@ -19,6 +22,9 @@ export default function LocateButton() {
       if (userMarker) {
         map.removeLayer(userMarker)
       }
+      if (userAccuracyCircle) {
+        map.removeLayer(userAccuracyCircle)
+      }
 
       userMarker = L.circleMarker(e.latlng, {
         radius: 10,
@@ -29,7 +35,7 @@ export default function LocateButton() {
         className: 'user-location-marker',
       }).addTo(map)
 
-      L.circle(e.latlng, {
+      userAccuracyCircle = L.circle(e.latlng, {
         radius: e.accuracy / 2,
         fillColor: '#3b82f6',
         fillOpacity: 0.1,

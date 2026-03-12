@@ -1,5 +1,8 @@
+'use client'
+
 import { Sheet } from 'react-modal-sheet'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
 import UpdateStatusForm from './UpdateStatusForm'
 import useTimeAgo from '../hooks/useTimeAgo'
 
@@ -14,24 +17,51 @@ export default function RestaurantSheet({ restaurant, statusData, onClose, onSta
   const [showForm, setShowForm] = useState(false)
   const [toast, setToast] = useState(null)
   const [confirming, setConfirming] = useState(false)
+  const toastTimeoutRef = useRef(null)
   const { text: timeAgoText, isStale } = useTimeAgo(statusData?.updated_at)
 
-  if (!restaurant) return null
+  useEffect(() => {
+    setShowForm(false)
+  }, [restaurant?.id])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        window.clearTimeout(toastTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const showToast = (message, tone = 'success') => {
+    setToast({ message, tone })
+
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current)
+    }
+
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null)
+    }, 3000)
+  }
 
   const status = statusData?.status || 'unknown'
   const statusInfo = STATUS_LABELS[status] || STATUS_LABELS.unknown
   const confirmations = statusData?.confirmations || 0
 
+  if (!restaurant) return null
+
   const handleSubmit = async (updateData) => {
-    await onStatusUpdate(updateData)
-    setShowForm(false)
-    setToast("Thanks for helping others find food 🙌")
+    try {
+      await onStatusUpdate(updateData)
+      setShowForm(false)
+      showToast('Thanks for helping others find food 🙌')
 
-    if (navigator.vibrate) {
-      navigator.vibrate(50)
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+    } catch (error) {
+      showToast(error.message || 'Could not save your update right now.', 'error')
     }
-
-    setTimeout(() => setToast(null), 3000)
   }
 
   const handleConfirm = async () => {
@@ -39,9 +69,10 @@ export default function RestaurantSheet({ restaurant, statusData, onClose, onSta
     setConfirming(true)
     try {
       await onConfirm(statusData.id)
-      setToast("Thanks for confirming! 👍")
+      showToast('Thanks for confirming! 👍')
       if (navigator.vibrate) navigator.vibrate(50)
-      setTimeout(() => setToast(null), 3000)
+    } catch (error) {
+      showToast(error.message || 'Could not confirm this update right now.', 'error')
     } finally {
       setConfirming(false)
     }
@@ -51,7 +82,7 @@ export default function RestaurantSheet({ restaurant, statusData, onClose, onSta
     <Sheet
       isOpen={!!restaurant}
       onClose={onClose}
-      snapPoints={[450, 320, 0]}
+      snapPoints={[0, 320, 1]}
       initialSnap={1}
     >
       <Sheet.Container style={{ backgroundColor: '#1a1a2e', borderRadius: '20px 20px 0 0' }}>
@@ -59,8 +90,14 @@ export default function RestaurantSheet({ restaurant, statusData, onClose, onSta
         <Sheet.Content>
           <div className="px-5 pb-6 flex flex-col gap-4">
             {toast && (
-              <div className="bg-green-500/20 text-green-300 text-sm font-medium px-4 py-2.5 rounded-xl text-center animate-fade-in">
-                {toast}
+              <div
+                className={`text-sm font-medium px-4 py-2.5 rounded-xl text-center animate-fade-in ${
+                  toast.tone === 'error'
+                    ? 'bg-red-500/20 text-red-300'
+                    : 'bg-green-500/20 text-green-300'
+                }`}
+              >
+                {toast.message}
               </div>
             )}
 
@@ -102,7 +139,7 @@ export default function RestaurantSheet({ restaurant, statusData, onClose, onSta
 
                 {statusData?.note && (
                   <p className="text-white/50 text-sm italic bg-white/5 rounded-xl px-4 py-3">
-                    "{statusData.note}"
+                    &quot;{statusData.note}&quot;
                   </p>
                 )}
 

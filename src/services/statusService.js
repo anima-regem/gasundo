@@ -1,81 +1,45 @@
-import { supabase } from './supabaseClient'
+async function parseResponse(response, fallbackMessage) {
+  let payload = null
 
-export async function getLatestStatuses() {
-  if (!supabase) return {}
-
-  // Get all statuses ordered by updated_at desc, then deduplicate by restaurant key
-  const { data, error } = await supabase
-    .from('restaurant_status')
-    .select('*')
-    .order('updated_at', { ascending: false })
-
-  if (error) {
-    console.error('Error fetching statuses:', error)
-    return {}
+  try {
+    payload = await response.json()
+  } catch {
+    payload = null
   }
 
-  const statusMap = {}
-  for (const row of data) {
-    const key = `${row.lat.toFixed(5)}_${row.lng.toFixed(5)}`
-    if (!statusMap[key]) {
-      statusMap[key] = row
-    }
+  if (!response.ok) {
+    throw new Error(payload?.error || fallbackMessage)
   }
 
-  return statusMap
+  return payload
 }
 
 export async function updateStatus({ restaurant_name, lat, lng, status, note }) {
-  if (!supabase) {
-    console.warn('Supabase not configured – status update skipped')
-    return null
-  }
+  const response = await fetch('/api/statuses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ restaurant_name, lat, lng, status, note }),
+  })
 
-  const { data, error } = await supabase
-    .from('restaurant_status')
-    .insert([{ restaurant_name, lat, lng, status, note, confirmations: 1 }])
-    .select()
+  const payload = await parseResponse(
+    response,
+    'Could not save your update right now.'
+  )
 
-  if (error) {
-    console.error('Error updating status:', error)
-    throw error
-  }
-
-  return data[0]
+  return payload.status
 }
 
 export async function confirmStatus(statusId) {
-  if (!supabase) {
-    console.warn('Supabase not configured – confirmation skipped')
-    return null
-  }
+  const response = await fetch(`/api/statuses/${statusId}/confirm`, {
+    method: 'POST',
+  })
 
-  const { data, error } = await supabase
-    .rpc('increment_confirmations', { status_id: statusId })
+  const payload = await parseResponse(
+    response,
+    'Could not confirm this update right now.'
+  )
 
-  if (error) {
-    // Fallback: fetch current value and update
-    const { data: current } = await supabase
-      .from('restaurant_status')
-      .select('confirmations')
-      .eq('id', statusId)
-      .single()
-
-    const newCount = (current?.confirmations || 0) + 1
-
-    const { data: updated, error: updateError } = await supabase
-      .from('restaurant_status')
-      .update({ confirmations: newCount })
-      .eq('id', statusId)
-      .select()
-
-    if (updateError) {
-      console.error('Error confirming status:', updateError)
-      throw updateError
-    }
-
-    return updated[0]
-  }
-
-  return data
+  return payload.status
 }
