@@ -7,7 +7,7 @@ const STATUS_FILTERS = [
   { value: 'closed', label: '🔴 Closed' },
 ]
 
-export default function FilterBar({ onFilterChange, filter, restaurants = [] }) {
+export default function FilterBar({ onFilterChange, filter, restaurants = [], onSelect }) {
   const [searchFocused, setSearchFocused] = useState(false)
 
   // Get up to 5 unique suggestions matching the search
