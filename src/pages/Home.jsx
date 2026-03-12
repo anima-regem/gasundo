@@ -99,7 +99,12 @@ export default function Home() {
 
       {/* Filter Bar */}
       {!loading && (
-        <FilterBar filter={filter} onFilterChange={setFilter} restaurants={restaurants} />
+        <FilterBar 
+          filter={filter} 
+          onFilterChange={setFilter} 
+          restaurants={restaurants} 
+          onSelect={setSelectedRestaurant}
+        />
       )}
 
       {/* Loading overlay */}

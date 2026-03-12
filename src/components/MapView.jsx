@@ -1,8 +1,9 @@
-import { MapContainer, TileLayer } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import RestaurantMarker from './RestaurantMarker'
 import LocateButton from './LocateButton'
 import L from 'leaflet'
+import { useEffect } from 'react'
 
 const KOCHI_CENTER = [9.9312, 76.2673]
 const DEFAULT_ZOOM = 13
@@ -15,7 +16,23 @@ const createClusterCustomIcon = function (cluster) {
   })
 }
 
-export default function MapView({ restaurants, statusMap, onSelectRestaurant }) {
+// Helper component to handle imperative map operations
+function MapController({ selectedRestaurant }) {
+  const map = useMap()
+  
+  useEffect(() => {
+    if (selectedRestaurant) {
+      map.flyTo([selectedRestaurant.lat, selectedRestaurant.lng], 16, {
+        animate: true,
+        duration: 1
+      })
+    }
+  }, [selectedRestaurant, map])
+
+  return null
+}
+
+export default function MapView({ restaurants, statusMap, onSelectRestaurant, selectedRestaurant }) {
   return (
     <MapContainer
       center={KOCHI_CENTER}
@@ -44,6 +61,7 @@ export default function MapView({ restaurants, statusMap, onSelectRestaurant }) 
         })}
       </MarkerClusterGroup>
       <LocateButton />
+      <MapController selectedRestaurant={selectedRestaurant} />
     </MapContainer>
   )
 }

@@ -54,7 +54,16 @@ export default function FilterBar({ onFilterChange, filter, restaurants = [] }) 
                 key={i}
                 onMouseDown={(e) => {
                   e.preventDefault() // prevent input blur
+                  
+                  // Find the full restaurant object
+                  const selectedRest = restaurants.find(r => r.name === sug)
+                  
                   onFilterChange({ ...filter, search: sug })
+                  
+                  if (selectedRest && onSelect) {
+                    onSelect(selectedRest)
+                  }
+                  
                   setSearchFocused(false)
                 }}
                 className="w-full text-left px-4 py-3 text-sm text-white/90 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0"
