@@ -129,6 +129,7 @@ export default function Home() {
         restaurants={filteredRestaurants}
         statusMap={statusMap}
         onSelectRestaurant={setSelectedRestaurant}
+        selectedRestaurant={selectedRestaurant}
       />
 
       {/* Restaurant count badge */}
