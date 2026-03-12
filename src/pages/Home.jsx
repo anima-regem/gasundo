@@ -86,12 +86,12 @@ export default function Home() {
   return (
     <div className="h-full flex flex-col relative">
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-[1000] bg-gradient-to-b from-[#1a1a2e]/95 to-transparent pointer-events-none">
+      <header className="absolute top-0 left-0 right-0 z-[1000] bg-gradient-to-b from-[#1a1a2e] via-[#1a1a2e]/80 to-transparent pointer-events-none pb-4">
         <div className="px-4 pt-3 pb-8 pointer-events-auto">
-          <h1 className="text-xl font-bold text-white tracking-tight">
+          <h1 className="text-xl font-bold text-white tracking-tight drop-shadow-md">
             🔥 GasUndo Kochi
           </h1>
-          <p className="text-white/40 text-xs mt-0.5">
+          <p className="text-white/90 font-medium text-xs mt-0.5 drop-shadow-md">
             Live map of restaurants affected by LPG shortage
           </p>
         </div>
