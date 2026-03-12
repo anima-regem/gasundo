@@ -1,0 +1,124 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #1a1a2e;
+}
+
+.map-container {
+  height: 100vh;
+  width: 100%;
+}
+
+/* Override Leaflet z-index to work with sheet */
+.leaflet-pane {
+  z-index: 1;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 2;
+}
+
+/* Make circle markers have larger touch targets */
+.leaflet-interactive {
+  cursor: pointer;
+}
+
+/* Sheet backdrop */
+[data-rsbs-backdrop] {
+  z-index: 998 !important;
+}
+
+/* Animate fade-in for toast */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Custom scrollbar for sheet */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+/* Ring marker - remove default leaflet icon styling */
+.custom-ring-marker {
+  background: none !important;
+  border: none !important;
+}
+
+/* Locate button */
+.locate-button {
+  position: absolute;
+  bottom: 80px;
+  right: 16px;
+  z-index: 999;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #1a1a2e;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s;
+}
+
+.locate-button:hover {
+  background: #2a2a4e;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.locate-button:active {
+  transform: scale(0.95);
+}
+
+.locate-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* User location pulse */
+.user-location-marker {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.6; }
+}
+
+/* Hide scrollbar on filter pills */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
