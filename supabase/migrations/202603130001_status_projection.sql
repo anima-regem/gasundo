@@ -20,7 +20,18 @@ as $$
 $$;
 
 alter table public.restaurant_status
+  add column if not exists created_at timestamptz,
   add column if not exists restaurant_key text;
+
+update public.restaurant_status
+set created_at = coalesce(created_at, updated_at, timezone('utc', now()))
+where created_at is null;
+
+alter table public.restaurant_status
+  alter column created_at set default timezone('utc', now());
+
+alter table public.restaurant_status
+  alter column created_at set not null;
 
 update public.restaurant_status
 set restaurant_key = public.build_restaurant_key(restaurant_name, lat, lng)
@@ -31,7 +42,7 @@ create index if not exists restaurant_status_restaurant_key_updated_at_idx
 
 create table if not exists public.restaurant_latest_status (
   restaurant_key text primary key,
-  status_id bigint unique not null references public.restaurant_status(id) on delete cascade,
+  status_id uuid unique not null references public.restaurant_status(id) on delete cascade,
   restaurant_name text not null,
   lat double precision not null,
   lng double precision not null,
@@ -164,7 +175,7 @@ on public.restaurant_status
 for each row
 execute function public.sync_restaurant_latest_status();
 
-create or replace function public.increment_confirmations(status_id bigint)
+create or replace function public.increment_confirmations(status_id uuid)
 returns setof public.restaurant_status
 language plpgsql
 security definer

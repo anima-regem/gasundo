@@ -55,7 +55,6 @@ export default function RestaurantSheet({
                 onStatusUpdate={onStatusUpdate}
                 onConfirm={onConfirm}
                 onNotice={onNotice}
-                stickyHeader
               />
             </div>
           </Sheet.Content>

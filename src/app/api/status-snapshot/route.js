@@ -1,20 +1,46 @@
 import { NextResponse } from 'next/server'
 
+import { getViewerIdentity } from '@/lib/device-identity'
 import { createStrongEtag, isEtagFresh } from '@/lib/http-cache'
-import { getLatestStatusSnapshot } from '@/lib/statuses'
+import {
+  applyViewerStatusState,
+  getViewerStatusState,
+  loadLatestStatusSnapshot,
+} from '@/lib/statuses'
 
 export const runtime = 'nodejs'
 
-const CACHE_CONTROL = 'public, s-maxage=15, stale-while-revalidate=45'
+const CACHE_CONTROL = 'private, no-cache, max-age=0, must-revalidate'
+const VARY_HEADER = 'Accept, X-Device-Id'
 
 export async function GET(request) {
   try {
-    const snapshot = await getLatestStatusSnapshot()
-    const snapshotVersion = createStrongEtag(snapshot.statuses).slice(1, -1)
+    const snapshot = await loadLatestStatusSnapshot()
+    const viewerIdentity = getViewerIdentity(request.headers)
+    let statuses = snapshot.statuses
+
+    if (viewerIdentity) {
+      const viewerStateByStatusId = await getViewerStatusState(
+        Object.values(snapshot.statuses || {})
+          .map((status) => status?.id)
+          .filter(Boolean),
+        viewerIdentity.identityHash
+      )
+
+      statuses = Object.fromEntries(
+        Object.entries(snapshot.statuses || {}).map(([restaurantKey, status]) => [
+          restaurantKey,
+          applyViewerStatusState(status, viewerStateByStatusId.get(status?.id)),
+        ])
+      )
+    }
+
+    const snapshotVersion = createStrongEtag(statuses).slice(1, -1)
     const etag = `"${snapshotVersion}"`
     const headers = {
       'Cache-Control': CACHE_CONTROL,
       ETag: etag,
+      Vary: VARY_HEADER,
     }
 
     if (isEtagFresh(request.headers.get('if-none-match'), etag)) {
@@ -25,7 +51,7 @@ export async function GET(request) {
       {
         generatedAt: snapshot.generatedAt,
         snapshotVersion,
-        statuses: snapshot.statuses,
+        statuses,
       },
       { headers }
     )

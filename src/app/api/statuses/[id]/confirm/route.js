@@ -1,15 +1,27 @@
 import { NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 
+import { getViewerIdentity } from '@/lib/device-identity'
 import { getClientIp } from '@/lib/http'
 import { enforceRateLimit, getStatusConfirmLimiter } from '@/lib/ratelimit'
-import { confirmStatus, STATUS_SNAPSHOT_CACHE_TAG } from '@/lib/statuses'
+import {
+  applyViewerStatusState,
+  confirmStatus,
+  getViewerStatusState,
+  StatusAlreadyConfirmedError,
+  StatusSelfConfirmationError,
+  STATUS_SNAPSHOT_CACHE_TAG,
+} from '@/lib/statuses'
 import { validateStatusId } from '@/lib/status-validation'
 
 export const runtime = 'nodejs'
 
 function jsonError(message, status, headers) {
   return NextResponse.json({ error: message }, { status, headers })
+}
+
+function getConfirmLimiterKey(clientIp, viewerIdentityHash) {
+  return viewerIdentityHash ? `${viewerIdentityHash}:${clientIp}` : clientIp
 }
 
 export async function POST(request, context) {
@@ -20,13 +32,22 @@ export async function POST(request, context) {
     return jsonError(validation.error, 400)
   }
 
+  const viewerIdentity = getViewerIdentity(request.headers)
+
+  if (!viewerIdentity) {
+    return jsonError('Refresh the page and try confirming again.', 400)
+  }
+
   const limiter = getStatusConfirmLimiter()
   const clientIp = getClientIp(request.headers)
 
   let rateLimitResult
 
   try {
-    rateLimitResult = await enforceRateLimit(limiter, clientIp)
+    rateLimitResult = await enforceRateLimit(
+      limiter,
+      getConfirmLimiterKey(clientIp, viewerIdentity.identityHash)
+    )
   } catch (error) {
     console.error('Status confirm rate limit configuration error:', error)
     return jsonError('Status confirmations are temporarily unavailable.', 500)
@@ -46,10 +67,47 @@ export async function POST(request, context) {
   }
 
   try {
-    const status = await confirmStatus(validation.data)
-    revalidateTag(STATUS_SNAPSHOT_CACHE_TAG)
-    return NextResponse.json({ status }, { status: 200 })
+    const viewerStateByStatusId = await getViewerStatusState(
+      [validation.data],
+      viewerIdentity.identityHash
+    )
+    const viewerState = viewerStateByStatusId.get(validation.data)
+
+    if (!viewerState?.exists) {
+      return jsonError('Status not found.', 404)
+    }
+
+    if (viewerState.viewer_is_author) {
+      return jsonError('You cannot confirm your own report.', 400)
+    }
+
+    if (viewerState.viewer_has_confirmed) {
+      return jsonError(
+        'You already confirmed this update from this device.',
+        400
+      )
+    }
+
+    const status = await confirmStatus(validation.data, viewerIdentity.identityHash)
+    revalidateTag(STATUS_SNAPSHOT_CACHE_TAG, 'max')
+    return NextResponse.json(
+      {
+        status: applyViewerStatusState(status, {
+          viewer_is_author: false,
+          viewer_has_confirmed: true,
+        }),
+      },
+      { status: 200 }
+    )
   } catch (error) {
+    if (error instanceof StatusSelfConfirmationError) {
+      return jsonError(error.message, 400)
+    }
+
+    if (error instanceof StatusAlreadyConfirmedError) {
+      return jsonError(error.message, 400)
+    }
+
     console.error('Failed to confirm status update:', error)
     return jsonError('Could not confirm this update right now.', 500)
   }

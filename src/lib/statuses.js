@@ -2,20 +2,29 @@ import 'server-only'
 
 import { unstable_cache } from 'next/cache'
 
+import { createStatusComment } from './comments.js'
 import { buildRestaurantKey, getRestaurantKey } from './status-key.js'
+import { isMissingRelationError } from './supabase-errors.js'
 import { getSupabaseAdmin, requireSupabaseAdmin } from './supabase-admin.js'
 
 const STATUS_SNAPSHOT_CACHE_TTL_SECONDS = 15
 export const STATUS_SNAPSHOT_CACHE_TAG = 'status-snapshot'
 const LATEST_STATUS_TABLE = 'restaurant_latest_status'
+const SELF_CONFIRMATION_ERROR = 'STATUS_SELF_CONFIRMATION_NOT_ALLOWED'
+const ALREADY_CONFIRMED_ERROR = 'STATUS_ALREADY_CONFIRMED'
 
-function isMissingRelationError(error) {
-  return (
-    error?.code === '42P01' ||
-    error?.code === '42703' ||
-    /relation .* does not exist/i.test(error?.message || '') ||
-    /column .* does not exist/i.test(error?.message || '')
-  )
+export class StatusAlreadyConfirmedError extends Error {
+  constructor(message = 'You already confirmed this update from this device.') {
+    super(message)
+    this.name = 'StatusAlreadyConfirmedError'
+  }
+}
+
+export class StatusSelfConfirmationError extends Error {
+  constructor(message = 'You cannot confirm your own report.') {
+    super(message)
+    this.name = 'StatusSelfConfirmationError'
+  }
 }
 
 function toLatestStatusRecord(result) {
@@ -36,6 +45,8 @@ function toLatestStatusRecord(result) {
     confirmations: Number(result.confirmations || 0),
     updated_at: result.updated_at || null,
     created_at: result.created_at || null,
+    viewer_has_confirmed: Boolean(result.viewer_has_confirmed),
+    viewer_is_author: Boolean(result.viewer_is_author),
   }
 }
 
@@ -53,6 +64,80 @@ function hasCompleteStatusPayload(status) {
       status?.restaurant_name &&
       Number.isFinite(status?.lat) &&
       Number.isFinite(status?.lng)
+  )
+}
+
+export function applyViewerStatusState(status, viewerState) {
+  if (!status) {
+    return null
+  }
+
+  return {
+    ...status,
+    viewer_has_confirmed: Boolean(
+      viewerState?.viewer_has_confirmed ?? status.viewer_has_confirmed
+    ),
+    viewer_is_author: Boolean(
+      viewerState?.viewer_is_author ?? status.viewer_is_author
+    ),
+  }
+}
+
+export async function getViewerStatusState(statusIds, viewerIdentityHash) {
+  const uniqueStatusIds = [...new Set((statusIds || []).filter(Boolean))]
+
+  if (uniqueStatusIds.length === 0) {
+    return new Map()
+  }
+
+  const supabase = requireSupabaseAdmin()
+  const { data: statusRows, error: statusError } = await supabase
+    .from('restaurant_status')
+    .select('id, author_identity_hash')
+    .in('id', uniqueStatusIds)
+
+  if (statusError) {
+    throw statusError
+  }
+
+  let confirmedStatusIds = new Set()
+
+  if (viewerIdentityHash) {
+    const { data: confirmationRows, error: confirmationError } = await supabase
+      .from('restaurant_status_confirmations')
+      .select('status_id')
+      .eq('confirmer_identity_hash', viewerIdentityHash)
+      .in('status_id', uniqueStatusIds)
+
+    if (confirmationError) {
+      throw confirmationError
+    }
+
+    confirmedStatusIds = new Set(
+      (confirmationRows || []).map((confirmationRow) => confirmationRow.status_id)
+    )
+  }
+
+  const statusRowsById = new Map(
+    (statusRows || []).map((statusRow) => [statusRow.id, statusRow])
+  )
+
+  return new Map(
+    uniqueStatusIds.map((statusId) => {
+      const statusRow = statusRowsById.get(statusId)
+
+      return [
+        statusId,
+        {
+          exists: Boolean(statusRow),
+          viewer_is_author:
+            Boolean(viewerIdentityHash) &&
+            Boolean(statusRow?.author_identity_hash) &&
+            statusRow.author_identity_hash === viewerIdentityHash,
+          viewer_has_confirmed: confirmedStatusIds.has(statusId),
+        },
+      ]
+    })
   )
 }
 
@@ -113,7 +198,7 @@ async function fetchLatestStatusesFromHistory(supabase) {
   return statuses
 }
 
-async function fetchLatestStatusSnapshot() {
+export async function loadLatestStatusSnapshot() {
   const supabase = getSupabaseAdmin()
 
   if (!supabase) {
@@ -141,7 +226,7 @@ async function fetchLatestStatusSnapshot() {
 }
 
 export const getLatestStatusSnapshot = unstable_cache(
-  fetchLatestStatusSnapshot,
+  loadLatestStatusSnapshot,
   ['status-snapshot'],
   {
     revalidate: STATUS_SNAPSHOT_CACHE_TTL_SECONDS,
@@ -228,6 +313,8 @@ export async function createStatus({
   lng,
   status,
   note,
+  authorIdentityHash = null,
+  authorLabel = null,
 }) {
   const supabase = requireSupabaseAdmin()
 
@@ -238,44 +325,52 @@ export async function createStatus({
     lng,
     status,
     note,
+    author_identity_hash: authorIdentityHash,
     confirmations: 1,
   })
+
+  if (note && authorIdentityHash && authorLabel) {
+    await createStatusComment({
+      statusId: createdStatus.id,
+      restaurantKey:
+        createdStatus.restaurant_key ||
+        restaurant_key ||
+        buildRestaurantKey({ restaurant_name, lat, lng }),
+      content: note,
+      authorIdentityHash,
+      authorLabel,
+    })
+  }
 
   return upsertLatestStatusProjection(supabase, createdStatus)
 }
 
-async function confirmStatusFallback(supabase, statusId) {
-  const current = await fetchStatusById(supabase, statusId)
-  const nextCount = (current?.confirmations || 0) + 1
+export async function confirmStatus(statusId, viewerIdentityHash) {
+  const supabase = requireSupabaseAdmin()
 
-  const { data, error } = await supabase
-    .from('restaurant_status')
-    .update({ confirmations: nextCount })
-    .eq('id', statusId)
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc('add_restaurant_status_confirmation', {
+    target_status_id: statusId,
+    confirmer_identity_hash: viewerIdentityHash,
+  })
 
   if (error) {
+    const errorMessage = String(error.message || '')
+
+    if (errorMessage.includes(SELF_CONFIRMATION_ERROR)) {
+      throw new StatusSelfConfirmationError()
+    }
+
+    if (errorMessage.includes(ALREADY_CONFIRMED_ERROR)) {
+      throw new StatusAlreadyConfirmedError()
+    }
+
     throw error
   }
 
-  return toLatestStatusRecord(data)
-}
-
-export async function confirmStatus(statusId) {
-  const supabase = requireSupabaseAdmin()
-
-  const { data, error } = await supabase.rpc('increment_confirmations', {
-    status_id: statusId,
-  })
   const rpcStatus = normalizeStatusResult(data)
-
-  const confirmedStatus =
-    error || !data
-      ? await confirmStatusFallback(supabase, statusId)
-      : hasCompleteStatusPayload(rpcStatus)
-        ? rpcStatus
-        : await fetchStatusById(supabase, rpcStatus?.id || statusId)
+  const confirmedStatus = hasCompleteStatusPayload(rpcStatus)
+    ? rpcStatus
+    : await fetchStatusById(supabase, rpcStatus?.id || statusId)
 
   return upsertLatestStatusProjection(supabase, confirmedStatus)
 }

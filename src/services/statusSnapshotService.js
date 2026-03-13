@@ -1,3 +1,5 @@
+import { getDeviceRequestHeaders } from '@/lib/device-identity-client'
+
 async function parseResponse(response, fallbackMessage) {
   let payload = null
 
@@ -18,6 +20,7 @@ export async function fetchStatusSnapshot() {
   const response = await fetch('/api/status-snapshot', {
     headers: {
       Accept: 'application/json',
+      ...getDeviceRequestHeaders(),
     },
   })
 

@@ -49,6 +49,14 @@ export function getStatusConfirmLimiter() {
   return getLimiter('ratelimit:status-confirm', 20, '15 m')
 }
 
+export function getCommentCreateLimiter() {
+  return getLimiter('ratelimit:comment-create', 10, '15 m')
+}
+
+export function getCommentUpvoteLimiter() {
+  return getLimiter('ratelimit:comment-upvote', 40, '15 m')
+}
+
 export async function enforceRateLimit(limiter, identifier) {
   if (!limiter) {
     throw new Error('Server is missing Upstash rate limit configuration.')

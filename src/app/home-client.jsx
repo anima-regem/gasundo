@@ -2,9 +2,10 @@
 
 import dynamic from 'next/dynamic'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 import FilterBar from '@/components/FilterBar'
+import DesktopBottomBar from '@/components/DesktopBottomBar'
 import RestaurantPanel from '@/components/RestaurantPanel'
 import RestaurantSheet from '@/components/RestaurantSheet'
 import {
@@ -48,6 +49,7 @@ function mergeStatusIntoSnapshot(snapshot, status) {
 
 export default function HomeClient({ initialRestaurants, initialError }) {
   const queryClient = useQueryClient()
+  const hasHydratedSharedRestaurantRef = useRef(false)
   const search = useQueryStore((state) => state.search)
   const statusFilter = useQueryStore((state) => state.statusFilter)
   const selectedRestaurantId = useQueryStore(
@@ -124,6 +126,34 @@ export default function HomeClient({ initialRestaurants, initialError }) {
     }
   }, [catalogIndex, clearSelectedRestaurant, selectedRestaurantId])
 
+  useEffect(() => {
+    if (
+      hasHydratedSharedRestaurantRef.current ||
+      typeof window === 'undefined'
+    ) {
+      return
+    }
+
+    const sharedRestaurantId = new URL(window.location.href).searchParams.get(
+      'restaurant'
+    )
+
+    if (!sharedRestaurantId) {
+      hasHydratedSharedRestaurantRef.current = true
+      return
+    }
+
+    if (catalogIndex.restaurantById[sharedRestaurantId]) {
+      setSelectedRestaurantId(sharedRestaurantId)
+      hasHydratedSharedRestaurantRef.current = true
+      return
+    }
+
+    if (catalogIndex.restaurantIds.length > 0) {
+      hasHydratedSharedRestaurantRef.current = true
+    }
+  }, [catalogIndex, setSelectedRestaurantId])
+
   const queryState = useMemo(
     () => ({
       search: deferredSearch,
@@ -191,6 +221,8 @@ export default function HomeClient({ initialRestaurants, initialError }) {
           created_at:
             previousSnapshot.statuses[nextStatus.restaurant_key]?.created_at ||
             new Date().toISOString(),
+          viewer_is_author: true,
+          viewer_has_confirmed: false,
         })
       )
 
@@ -230,6 +262,7 @@ export default function HomeClient({ initialRestaurants, initialError }) {
         mergeStatusIntoSnapshot(previousSnapshot, {
           ...statusData,
           confirmations: Number(statusData.confirmations || 0) + 1,
+          viewer_has_confirmed: true,
         })
       )
 
@@ -282,8 +315,14 @@ export default function HomeClient({ initialRestaurants, initialError }) {
   }
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden">
-      <div className="relative min-h-screen lg:flex lg:h-full lg:min-h-0">
+    <div
+      className="app-mobile-shell lg:h-screen lg:overflow-hidden"
+      style={{ minHeight: 'var(--app-vh)' }}
+    >
+      <div
+        className="relative app-mobile-shell lg:flex lg:h-full lg:min-h-0"
+        style={{ minHeight: 'var(--app-vh)' }}
+      >
         <RestaurantPanel
           searchValue={search}
           onSearchChange={setSearch}
@@ -292,16 +331,11 @@ export default function HomeClient({ initialRestaurants, initialError }) {
           onStatusFilterChange={setStatusFilter}
           suggestions={suggestions}
           onSelectSuggestion={handleSelectSuggestion}
-          visibleRestaurantIds={visibleRestaurantIds}
-          restaurantById={catalogIndex.restaurantById}
-          statusMap={statusMap}
           totalCount={catalogIndex.restaurantIds.length}
           resultCount={visibleRestaurantIds.length}
           summaryCounts={summaryCounts}
           selectedRestaurant={selectedRestaurant}
-          selectedRestaurantId={selectedRestaurantId}
           selectedStatusData={selectedStatusData}
-          onSelectRestaurant={handleSelectRestaurant}
           onClearSelection={clearSelectedRestaurant}
           onStatusUpdate={handleStatusUpdate}
           onConfirm={handleConfirm}
@@ -310,7 +344,10 @@ export default function HomeClient({ initialRestaurants, initialError }) {
           isPending={isFiltering}
         />
 
-        <div className="relative min-h-[100dvh] flex-1 overflow-hidden lg:h-full lg:min-h-0">
+        <div
+          className="relative app-mobile-stage flex-1 overflow-hidden lg:h-full lg:min-h-0"
+          style={{ minHeight: 'var(--app-vh)' }}
+        >
           <div className="absolute inset-0">
             <MapView
               restaurantIds={mapRestaurantIds}
@@ -339,6 +376,12 @@ export default function HomeClient({ initialRestaurants, initialError }) {
             notice={notice}
             isPending={isFiltering}
             variant="mobile"
+          />
+
+          <DesktopBottomBar
+            resultCount={visibleRestaurantIds.length}
+            totalCount={catalogIndex.restaurantIds.length}
+            isPending={isFiltering}
           />
 
           <RestaurantSheet
