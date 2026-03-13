@@ -1,5 +1,13 @@
 'use client'
 
+function getMapFocusLabel(resultCount, totalCount) {
+  if (resultCount === totalCount) {
+    return `${totalCount} mapped places`
+  }
+
+  return `${resultCount} ${resultCount === 1 ? 'place' : 'places'} on the map`
+}
+
 export default function DesktopBottomBar({
   resultCount,
   totalCount,
@@ -13,9 +21,7 @@ export default function DesktopBottomBar({
             Map focus
           </div>
           <div className="mt-1 font-display text-[1.08rem] font-semibold text-white">
-            {resultCount === totalCount
-              ? `${totalCount} mapped places`
-              : `${resultCount} places on the map`}
+            {getMapFocusLabel(resultCount, totalCount)}
           </div>
           <p className="mt-1 text-sm text-slate-300/70">
             Search and status filters narrow the map directly. Pick a suggestion or marker to open details.

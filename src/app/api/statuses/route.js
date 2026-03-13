@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 
+import { getViewerIdentity } from '@/lib/device-identity'
 import { getClientIp } from '@/lib/http'
 import { enforceRateLimit, getStatusCreateLimiter } from '@/lib/ratelimit'
-import { createStatus, STATUS_SNAPSHOT_CACHE_TAG } from '@/lib/statuses'
+import {
+  applyViewerStatusState,
+  createStatus,
+  STATUS_SNAPSHOT_CACHE_TAG,
+} from '@/lib/statuses'
 import { validateCreateStatusPayload } from '@/lib/status-validation'
 
 export const runtime = 'nodejs'
@@ -52,9 +57,22 @@ export async function POST(request) {
   }
 
   try {
-    const status = await createStatus(validation.data)
-    revalidateTag(STATUS_SNAPSHOT_CACHE_TAG)
-    return NextResponse.json({ status }, { status: 201 })
+    const viewerIdentity = getViewerIdentity(request.headers)
+    const status = await createStatus({
+      ...validation.data,
+      authorIdentityHash: viewerIdentity?.identityHash || null,
+      authorLabel: viewerIdentity?.label || null,
+    })
+    revalidateTag(STATUS_SNAPSHOT_CACHE_TAG, 'max')
+    return NextResponse.json(
+      {
+        status: applyViewerStatusState(status, {
+          viewer_is_author: Boolean(viewerIdentity),
+          viewer_has_confirmed: false,
+        }),
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Failed to create status update:', error)
     return jsonError('Could not save your update right now.', 500)

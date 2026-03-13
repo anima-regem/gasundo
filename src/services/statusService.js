@@ -1,3 +1,5 @@
+import { getDeviceRequestHeaders } from '@/lib/device-identity-client'
+
 async function parseResponse(response, fallbackMessage) {
   let payload = null
 
@@ -26,6 +28,7 @@ export async function updateStatus({
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getDeviceRequestHeaders(),
     },
     body: JSON.stringify({
       restaurant_name,
@@ -48,6 +51,7 @@ export async function updateStatus({
 export async function confirmStatus(statusId) {
   const response = await fetch(`/api/statuses/${statusId}/confirm`, {
     method: 'POST',
+    headers: getDeviceRequestHeaders(),
   })
 
   const payload = await parseResponse(

@@ -61,9 +61,9 @@ export default function RestaurantPanel({
               ].map((item) => (
                 <div
                   key={item.key}
-                  className="rounded-[18px] border border-white/10 bg-white/5 px-3 py-3"
+                  className="min-w-0 rounded-[18px] border border-white/10 bg-white/5 px-3 py-3"
                 >
-                  <div className="text-[0.58rem] font-semibold uppercase tracking-[0.22em] text-slate-300/52">
+                  <div className="truncate text-[0.52rem] font-semibold uppercase tracking-[0.16em] text-slate-300/52">
                     {item.label}
                   </div>
                   <div className="mt-1.5 font-display text-[1.2rem] font-semibold text-white">

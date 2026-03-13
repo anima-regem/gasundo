@@ -2,9 +2,62 @@
 
 import { useEffect, useState } from 'react'
 
+import CommentThread from './CommentThread'
 import UpdateStatusForm from './UpdateStatusForm'
 import useTimeAgo from '@/hooks/useTimeAgo'
+import { buildGoogleMapsPlaceUrl } from '@/lib/map-links'
+import { getRestaurantCommentsQueryKey } from '@/lib/query-keys'
 import { getStatusMeta } from '@/lib/status-ui'
+import { isUuid } from '@/lib/uuid'
+import { useQueryClient } from '@tanstack/react-query'
+
+function GoogleMapsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+      <path
+        d="M12 2.75c-3.52 0-6.38 2.82-6.38 6.3 0 4.76 5.3 10.48 5.52 10.72a1.15 1.15 0 0 0 1.72 0c.22-.24 5.52-5.96 5.52-10.72 0-3.48-2.86-6.3-6.38-6.3Z"
+        fill="#EA4335"
+      />
+      <path
+        d="M12 5.9a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Z"
+        fill="#FFF"
+      />
+      <path
+        d="M6 6.4 3.75 7.7v11.8L6 18.2V6.4Z"
+        fill="#34A853"
+      />
+      <path
+        d="m6 6.4 5 1.95v11.8L6 18.2V6.4Z"
+        fill="#FBBC04"
+      />
+      <path
+        d="m11 8.35 5-1.95v11.8l-5 1.95V8.35Z"
+        fill="#4285F4"
+      />
+      <path
+        d="M16 6.4 20.25 4.9v11.8L16 18.2V6.4Z"
+        fill="#1A73E8"
+      />
+    </svg>
+  )
+}
+
+function ShareIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+      <circle cx="18" cy="5.5" r="2.75" fill="currentColor" />
+      <circle cx="6" cy="12" r="2.75" fill="currentColor" />
+      <circle cx="18" cy="18.5" r="2.75" fill="currentColor" />
+      <path
+        d="m8.45 10.82 6.96-3.96m-6.96 6.32 6.96 3.96"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  )
+}
 
 export default function RestaurantDetailCard({
   restaurant,
@@ -16,6 +69,7 @@ export default function RestaurantDetailCard({
   variant = 'sheet',
   stickyHeader = false,
 }) {
+  const queryClient = useQueryClient()
   const [showComposer, setShowComposer] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const { text: timeAgoText, isStale } = useTimeAgo(statusData?.updated_at)
@@ -29,8 +83,12 @@ export default function RestaurantDetailCard({
 
   const status = statusData?.status || 'unknown'
   const statusMeta = getStatusMeta(status)
+  const googleMapsUrl = buildGoogleMapsPlaceUrl(restaurant)
   const confirmations = statusData?.confirmations || 0
   const hasKnownStatus = status !== 'unknown' && Boolean(statusData?.id)
+  const viewerIsAuthor = Boolean(statusData?.viewer_is_author)
+  const viewerHasConfirmed = Boolean(statusData?.viewer_has_confirmed)
+  const confirmDisabled = confirming || viewerIsAuthor || viewerHasConfirmed
   const isPanel = variant === 'panel' || isEmbedded
   const surfaceClass =
     isEmbedded
@@ -50,10 +108,48 @@ export default function RestaurantDetailCard({
     : `space-y-4 ${stickyHeader ? 'pt-5' : ''}`
   const actionClass = isPanel ? 'flex flex-col gap-2.5' : 'flex flex-col gap-3 sm:flex-row'
 
+  const handleShare = async () => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    if (!googleMapsUrl) {
+      onNotice?.('No restaurant link is available right now.', 'error')
+      return
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(googleMapsUrl)
+        onNotice?.('Restaurant link copied.', 'success')
+        return
+      }
+
+      window.prompt('Copy this restaurant link', googleMapsUrl)
+    } catch {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(googleMapsUrl)
+          onNotice?.('Restaurant link copied.', 'success')
+          return
+        } catch {
+          // Fall through to the final error notice.
+        }
+      }
+
+      onNotice?.('Could not copy this restaurant right now.', 'error')
+    }
+  }
+
   const handleSubmit = async (updateData) => {
     try {
       await onStatusUpdate(updateData)
       setShowComposer(false)
+      if (restaurant?.restaurant_key && isUuid(statusData?.id)) {
+        queryClient.invalidateQueries({
+          queryKey: getRestaurantCommentsQueryKey(restaurant.restaurant_key),
+        })
+      }
       onNotice?.('Thanks for helping others find food.', 'success')
 
       if (navigator.vibrate) {
@@ -65,7 +161,7 @@ export default function RestaurantDetailCard({
   }
 
   const handleConfirm = async () => {
-    if (!statusData?.id || confirming) return
+    if (!statusData?.id || confirmDisabled) return
 
     setConfirming(true)
     try {
@@ -88,7 +184,7 @@ export default function RestaurantDetailCard({
         className={`${headerClass} ${stickyHeader ? 'sticky top-0 z-10 -mx-5 -mt-2 rounded-b-[28px] border-b border-white/8 bg-[rgba(10,16,34,0.94)] px-5 pb-4 pt-3 backdrop-blur-2xl' : ''}`}
       >
         <div className="flex items-start justify-between gap-4">
-          <div className={isPanel ? 'max-w-[220px] space-y-2' : 'space-y-2'}>
+          <div className={`min-w-0 ${isPanel ? 'max-w-[220px] space-y-2' : 'space-y-2'}`}>
             {restaurant.brand ? (
               <span className="inline-flex items-center rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-slate-300/72">
                 {restaurant.brand}
@@ -109,15 +205,38 @@ export default function RestaurantDetailCard({
               )}
             </div>
           </div>
-          {isPanel && onClose ? (
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={onClose}
-              className="mt-0.5 shrink-0 rounded-full border border-white/10 bg-white/6 px-3.5 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-200/75 transition hover:border-white/18 hover:bg-white/10 hover:text-white"
+              onClick={handleShare}
+              aria-label={`Copy ${restaurant.name} link`}
+              title="Copy restaurant link"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition hover:border-white/18 hover:bg-white/10 hover:text-white"
             >
-              Back
+              <ShareIcon />
             </button>
-          ) : null}
+            {googleMapsUrl ? (
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label={`Open ${restaurant.name} in Google Maps`}
+                title="Open in Google Maps"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition hover:border-white/18 hover:bg-white/10 hover:text-white"
+              >
+                <GoogleMapsIcon />
+              </a>
+            ) : null}
+            {isPanel && onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-0.5 shrink-0 rounded-full border border-white/10 bg-white/6 px-3.5 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-slate-200/75 transition hover:border-white/18 hover:bg-white/10 hover:text-white"
+              >
+                Back
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className={primaryGridClass}>
@@ -177,10 +296,10 @@ export default function RestaurantDetailCard({
 
           <div className="rounded-[20px] border border-white/10 bg-white/5 p-4">
             <div className="text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-slate-300/55">
-              Latest note
+              Thread
             </div>
             <div className={`${isPanel ? 'mt-2.5 text-[0.82rem] leading-6' : 'mt-2 text-sm leading-6'} text-slate-200/88`}>
-              {statusData?.note ? statusData.note : 'No note yet. Add one when you report.'}
+              Comments stay with this place so diners can add context and vote useful tips up.
             </div>
           </div>
         </div>
@@ -193,12 +312,18 @@ export default function RestaurantDetailCard({
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={confirming}
+                disabled={confirmDisabled}
                 className={`flex-1 rounded-[18px] border border-white/10 bg-white/6 font-semibold text-slate-100 transition hover:border-white/18 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 ${
                   isPanel ? 'px-4 py-3 text-[0.92rem]' : 'px-4 py-4 text-sm'
                 }`}
               >
-                {confirming ? 'Confirming...' : 'Confirm this update'}
+                {confirming
+                  ? 'Confirming...'
+                  : viewerIsAuthor
+                    ? 'You reported this status'
+                    : viewerHasConfirmed
+                      ? 'Already confirmed'
+                      : 'Confirm this update'}
               </button>
             ) : null}
             <button
@@ -212,6 +337,13 @@ export default function RestaurantDetailCard({
             </button>
           </div>
         )}
+
+        <CommentThread
+          restaurant={restaurant}
+          statusData={statusData}
+          onNotice={onNotice}
+          compact={isPanel}
+        />
       </div>
     </section>
   )

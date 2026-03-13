@@ -1,5 +1,6 @@
 import { isWithinKochiBounds, STATUS_VALUES } from './constants.js'
 import { buildRestaurantKey } from './status-key.js'
+import { isUuid } from './uuid.js'
 
 function toNumber(value) {
   const normalized =
@@ -45,8 +46,8 @@ export function validateCreateStatusPayload(payload) {
   }
 
   const rawNote = typeof payload.note === 'string' ? payload.note.trim() : ''
-  if (rawNote.length > 200) {
-    return { error: 'Note must be 200 characters or fewer.' }
+  if (rawNote.length > 500) {
+    return { error: 'Comment must be 500 characters or fewer.' }
   }
 
   const restaurantKeyInput =
@@ -74,9 +75,9 @@ export function validateCreateStatusPayload(payload) {
 }
 
 export function validateStatusId(value) {
-  const id = Number(value)
+  const id = typeof value === 'string' ? value.trim() : ''
 
-  if (!Number.isInteger(id) || id < 1) {
+  if (!isUuid(id)) {
     return { error: 'Invalid status id.' }
   }
 

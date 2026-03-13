@@ -192,6 +192,8 @@ export default function HomeClient({ initialRestaurants, initialError }) {
           created_at:
             previousSnapshot.statuses[nextStatus.restaurant_key]?.created_at ||
             new Date().toISOString(),
+          viewer_is_author: true,
+          viewer_has_confirmed: false,
         })
       )
 
@@ -231,6 +233,7 @@ export default function HomeClient({ initialRestaurants, initialError }) {
         mergeStatusIntoSnapshot(previousSnapshot, {
           ...statusData,
           confirmations: Number(statusData.confirmations || 0) + 1,
+          viewer_has_confirmed: true,
         })
       )
 

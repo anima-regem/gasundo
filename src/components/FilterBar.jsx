@@ -10,6 +10,14 @@ function getFilterCount(value, totalCount, summaryCounts) {
   return summaryCounts[value] || 0
 }
 
+function getMobileResultsLabel(resultCount, totalCount) {
+  if (resultCount === totalCount) {
+    return `${totalCount} mapped`
+  }
+
+  return `${resultCount} shown`
+}
+
 export default function FilterBar({
   searchValue,
   onSearchChange,
@@ -42,6 +50,17 @@ export default function FilterBar({
     setSearchFocused(false)
   }
 
+  const isMobile = variant === 'mobile'
+  const usesGridFilterLayout = isMobile || variant === 'panel'
+  const searchInputPaddingClass = searchValue
+    ? isMobile
+      ? 'pr-14'
+      : 'pr-24'
+    : 'pr-4'
+  const filterContainerClass = usesGridFilterLayout
+    ? `${variant === 'panel' ? 'mt-2' : 'mt-2.5'} grid grid-cols-2 gap-1.5`
+    : `${variant === 'panel' ? 'mt-2' : 'mt-2.5'} flex gap-2 overflow-x-auto no-scrollbar`
+
   return (
     <div className={rootClass}>
       <div className={cardClass} data-mobile-filter={variant === 'mobile' ? 'true' : undefined}>
@@ -53,9 +72,7 @@ export default function FilterBar({
                 GasUndo Kochi
               </div>
               <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.24em] text-slate-300/68">
-                {resultCount === totalCount
-                  ? `${totalCount} mapped`
-                  : `${resultCount} shown`}
+                {getMobileResultsLabel(resultCount, totalCount)}
               </div>
             </div>
 
@@ -83,7 +100,7 @@ export default function FilterBar({
               searchFocused
                 ? 'border-white/18 bg-white/10'
                 : 'border-white/10 bg-white/6 hover:border-white/16'
-            }`}
+            } ${searchInputPaddingClass}`}
           />
           <span
             aria-hidden="true"
@@ -98,11 +115,13 @@ export default function FilterBar({
               type="button"
               onClick={onClearSearch}
               aria-label="Clear search"
-              className={`absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/6 text-xs font-semibold uppercase tracking-[0.2em] text-slate-300/72 transition hover:border-white/16 hover:bg-white/10 hover:text-white ${
-                variant === 'panel' ? 'px-2 py-1' : 'px-2 py-1'
+              className={`absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-white/10 bg-white/6 text-slate-300/72 transition hover:border-white/16 hover:bg-white/10 hover:text-white ${
+                isMobile
+                  ? 'flex h-8 w-8 items-center justify-center text-lg leading-none'
+                  : 'px-2 py-1 text-xs font-semibold uppercase tracking-[0.2em]'
               }`}
             >
-              Clear
+              {isMobile ? <span aria-hidden="true">×</span> : 'Clear'}
             </button>
           ) : null}
 
@@ -118,17 +137,19 @@ export default function FilterBar({
                   }}
                   className="flex w-full items-center justify-between gap-3 border-b border-white/6 px-4 py-3 text-left text-sm text-slate-100 transition hover:bg-white/8 last:border-b-0"
                 >
-                  <div>
-                    <span>{suggestion.label}</span>
+                  <div className="min-w-0">
+                    <span className="block truncate">{suggestion.label}</span>
                     {suggestion.brand ? (
                       <div className="mt-1 text-[0.66rem] uppercase tracking-[0.22em] text-slate-300/48">
                         {suggestion.brand}
                       </div>
                     ) : null}
                   </div>
-                  <span className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-300/48">
-                    select
-                  </span>
+                  {isMobile ? null : (
+                    <span className="text-[0.68rem] uppercase tracking-[0.22em] text-slate-300/48">
+                      select
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -150,9 +171,7 @@ export default function FilterBar({
           </div>
         ) : null}
 
-        <div
-          className={`${variant === 'panel' ? 'mt-2' : 'mt-2.5'} flex gap-2 overflow-x-auto no-scrollbar`}
-        >
+        <div className={filterContainerClass}>
           {STATUS_FILTERS.map((filterOption) => {
             const isActive = statusFilter === filterOption.value
             const count = getFilterCount(
@@ -160,6 +179,10 @@ export default function FilterBar({
               totalCount,
               summaryCounts
             )
+            const filterLabel =
+              isMobile && filterOption.value === 'all'
+                ? 'All'
+                : filterOption.label
             const statusMeta =
               filterOption.value !== 'all'
                 ? STATUS_META[filterOption.value]
@@ -170,8 +193,12 @@ export default function FilterBar({
                 key={filterOption.value}
                 type="button"
                 onClick={() => onStatusFilterChange(filterOption.value)}
-                className={`inline-flex items-center gap-2 rounded-full border text-sm font-semibold whitespace-nowrap transition ${
-                  variant === 'panel' ? 'min-h-10 px-3.5 py-2' : 'min-h-9.5 px-3.5 py-2 text-[0.84rem]'
+                className={`inline-flex items-center rounded-full border font-semibold whitespace-nowrap transition ${
+                  isMobile
+                    ? 'w-full min-h-10 justify-between gap-1.5 px-3 py-2 text-[0.78rem]'
+                    : usesGridFilterLayout
+                    ? 'w-full min-h-10 justify-between gap-2 px-3.5 py-2 text-sm'
+                    : 'min-h-9.5 gap-2 px-3.5 py-2 text-[0.84rem]'
                 } ${
                   isActive
                     ? statusMeta
@@ -182,11 +209,19 @@ export default function FilterBar({
               >
                 {statusMeta ? (
                   <span
-                    className={`h-2.5 w-2.5 rounded-full ${statusMeta.dotClass}`}
+                    className={`shrink-0 rounded-full ${statusMeta.dotClass} ${
+                      isMobile ? 'h-2 w-2' : 'h-2.5 w-2.5'
+                    }`}
                   />
                 ) : null}
-                <span>{filterOption.label}</span>
-                <span className="rounded-full border border-current/18 px-2 py-0.5 text-[0.68rem]">
+                <span className={isMobile ? 'truncate' : undefined}>
+                  {filterLabel}
+                </span>
+                <span
+                  className={`rounded-full border border-current/18 px-2 py-0.5 ${
+                    isMobile ? 'text-[0.62rem]' : 'text-[0.68rem]'
+                  }`}
+                >
                   {count}
                 </span>
               </button>
