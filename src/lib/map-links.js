@@ -18,7 +18,7 @@ export function buildGoogleMapsPlaceUrl(restaurant) {
   const restaurantName =
     typeof restaurant?.name === 'string' ? restaurant.name.trim() : ''
   const query = restaurantName
-    ? `${restaurantName} ${lat},${lng}`
+    ? `${lat},${lng} ${restaurantName}`
     : `${lat},${lng}`
 
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`

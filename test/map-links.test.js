@@ -10,7 +10,7 @@ test('buildGoogleMapsPlaceUrl includes the restaurant name and coordinates', () 
       lat: 9.96188,
       lng: 76.30787,
     }),
-    'https://www.google.com/maps/search/?api=1&query=New%20Golden%20Bakers%209.96188%2C76.30787'
+    'https://www.google.com/maps/search/?api=1&query=9.96188%2C76.30787%20New%20Golden%20Bakers'
   )
 })
 

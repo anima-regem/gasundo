@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 
 import FilterBar from '@/components/FilterBar'
 import DesktopBottomBar from '@/components/DesktopBottomBar'
@@ -49,6 +49,7 @@ function mergeStatusIntoSnapshot(snapshot, status) {
 
 export default function HomeClient({ initialRestaurants, initialError }) {
   const queryClient = useQueryClient()
+  const hasHydratedSharedRestaurantRef = useRef(false)
   const search = useQueryStore((state) => state.search)
   const statusFilter = useQueryStore((state) => state.statusFilter)
   const selectedRestaurantId = useQueryStore(
@@ -124,6 +125,34 @@ export default function HomeClient({ initialRestaurants, initialError }) {
       clearSelectedRestaurant()
     }
   }, [catalogIndex, clearSelectedRestaurant, selectedRestaurantId])
+
+  useEffect(() => {
+    if (
+      hasHydratedSharedRestaurantRef.current ||
+      typeof window === 'undefined'
+    ) {
+      return
+    }
+
+    const sharedRestaurantId = new URL(window.location.href).searchParams.get(
+      'restaurant'
+    )
+
+    if (!sharedRestaurantId) {
+      hasHydratedSharedRestaurantRef.current = true
+      return
+    }
+
+    if (catalogIndex.restaurantById[sharedRestaurantId]) {
+      setSelectedRestaurantId(sharedRestaurantId)
+      hasHydratedSharedRestaurantRef.current = true
+      return
+    }
+
+    if (catalogIndex.restaurantIds.length > 0) {
+      hasHydratedSharedRestaurantRef.current = true
+    }
+  }, [catalogIndex, setSelectedRestaurantId])
 
   const queryState = useMemo(
     () => ({

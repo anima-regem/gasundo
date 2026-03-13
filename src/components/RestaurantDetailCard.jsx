@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 import CommentThread from './CommentThread'
 import UpdateStatusForm from './UpdateStatusForm'
+import { buildRestaurantShareUrl } from '@/lib/app-links'
 import useTimeAgo from '@/hooks/useTimeAgo'
 import { buildGoogleMapsPlaceUrl } from '@/lib/map-links'
 import { getRestaurantCommentsQueryKey } from '@/lib/query-keys'
@@ -113,23 +114,25 @@ export default function RestaurantDetailCard({
       return
     }
 
-    if (!googleMapsUrl) {
+    const appShareUrl = buildRestaurantShareUrl(window.location.href, restaurant)
+
+    if (!appShareUrl) {
       onNotice?.('No restaurant link is available right now.', 'error')
       return
     }
 
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(googleMapsUrl)
+        await navigator.clipboard.writeText(appShareUrl)
         onNotice?.('Restaurant link copied.', 'success')
         return
       }
 
-      window.prompt('Copy this restaurant link', googleMapsUrl)
+      window.prompt('Copy this restaurant link', appShareUrl)
     } catch {
       if (navigator.clipboard?.writeText) {
         try {
-          await navigator.clipboard.writeText(googleMapsUrl)
+          await navigator.clipboard.writeText(appShareUrl)
           onNotice?.('Restaurant link copied.', 'success')
           return
         } catch {
