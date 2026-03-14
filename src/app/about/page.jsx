@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="min-h-[var(--app-vh)] bg-[radial-gradient(circle_at_top_left,rgba(255,122,69,0.16),transparent_22%),radial-gradient(circle_at_top_right,rgba(250,204,21,0.08),transparent_16%),linear-gradient(180deg,#091122,#060b18_46%,#040811)] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+    <main className="h-[var(--app-vh)] overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(255,122,69,0.16),transparent_22%),radial-gradient(circle_at_top_right,rgba(250,204,21,0.08),transparent_16%),linear-gradient(180deg,#091122,#060b18_46%,#040811)] px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
       <div className="mx-auto max-w-3xl">
         <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(12,18,36,0.92),rgba(7,12,24,0.9))] p-6 shadow-[0_30px_80px_rgba(5,8,22,0.34)] backdrop-blur-2xl sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.32em] text-[var(--accent-gold)]/74">
