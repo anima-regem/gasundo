@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import DistrictSelect from './DistrictSelect'
 import NoticeBanner from './NoticeBanner'
 import { STATUS_FILTERS, STATUS_META } from '@/lib/status-ui'
 
@@ -33,6 +34,9 @@ function getMobileResultsLabel(resultCount, totalCount) {
 }
 
 export default function FilterBar({
+  districtOptions = [],
+  selectedDistrict = null,
+  onDistrictChange,
   searchValue,
   onSearchChange,
   onClearSearch,
@@ -65,11 +69,13 @@ export default function FilterBar({
   }
 
   const isMobile = variant === 'mobile'
-  const usesGridFilterLayout = isMobile || variant === 'panel'
+  const usesGridFilterLayout = variant === 'panel'
   const searchInputPaddingClass = searchValue ? 'pr-14' : 'pr-4'
-  const filterContainerClass = usesGridFilterLayout
-    ? `${variant === 'panel' ? 'mt-2' : 'mt-2.5'} grid grid-cols-2 gap-1.5`
-    : `${variant === 'panel' ? 'mt-2' : 'mt-2.5'} flex gap-2 overflow-x-auto no-scrollbar`
+  const filterContainerClass = isMobile
+    ? 'mt-2.5 flex gap-1.5 overflow-x-auto pb-1 no-scrollbar snap-x snap-mandatory'
+    : usesGridFilterLayout
+      ? `${variant === 'panel' ? 'mt-2' : 'mt-2.5'} grid grid-cols-2 gap-1.5`
+      : `${variant === 'panel' ? 'mt-2' : 'mt-2.5'} flex gap-2 overflow-x-auto no-scrollbar`
 
   return (
     <div className={rootClass}>
@@ -79,7 +85,7 @@ export default function FilterBar({
             <div className="flex items-center justify-between gap-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.24em] text-slate-300/68">
                 <span className="h-2 w-2 rounded-full bg-[var(--accent-ember)] shadow-[0_0_14px_rgba(255,122,69,0.55)]" />
-                GasUndo Kochi
+                GasUndo Kerala
               </div>
               <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.24em] text-slate-300/68">
                 {getMobileResultsLabel(resultCount, totalCount)}
@@ -87,6 +93,15 @@ export default function FilterBar({
             </div>
 
             <NoticeBanner notice={notice} className="mt-3" />
+
+            <div className="mt-3">
+              <DistrictSelect
+                districtOptions={districtOptions}
+                selectedDistrict={selectedDistrict}
+                onDistrictChange={onDistrictChange}
+                variant="compact"
+              />
+            </div>
           </>
         ) : null}
 
@@ -202,7 +217,7 @@ export default function FilterBar({
                 onClick={() => onStatusFilterChange(filterOption.value)}
                 className={`inline-flex items-center rounded-full border font-semibold whitespace-nowrap transition ${
                   isMobile
-                    ? 'w-full min-h-10 justify-between gap-1.5 px-3 py-2 text-[0.78rem]'
+                    ? 'min-h-10 min-w-[132px] shrink-0 snap-start justify-between gap-2 px-3 py-2 text-[0.78rem]'
                     : usesGridFilterLayout
                     ? 'w-full min-h-10 justify-between gap-2 px-3.5 py-2 text-sm'
                     : 'min-h-9.5 gap-2 px-3.5 py-2 text-[0.84rem]'
